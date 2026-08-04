@@ -1,8 +1,9 @@
 import asyncio
 import uuid
-from typing import Any, dict
+from typing import Any
 
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.db import AsyncSessionLocal
 from app.common.redis import publish_job_progress
@@ -14,11 +15,16 @@ from app.videos.service import elevenlabs_service, remotion_service
 
 
 async def process_video_render_job(
-    ctx: dict[str, Any], job_id: str
+    ctx: dict[str, Any],
+    job_id: str,
+    db_session: AsyncSession | None = None,
 ) -> dict[str, Any]:
+    """
+    ARQ Background Worker Task for rendering video pipeline.
+    """
     job_uuid = uuid.UUID(job_id)
 
-    async with AsyncSessionLocal() as session:
+    async def _run(session: AsyncSession) -> dict[str, Any]:
         statement = select(VideoJob).where(VideoJob.id == job_uuid)
         result = await session.exec(statement)
         job = result.first()
@@ -71,17 +77,17 @@ async def process_video_render_job(
                 elevenlabs_api_key=elevenlabs_key,
             )
 
-            # Upload audio to S3
+            # Upload audio to Cloudflare R2
             await publish_job_progress(
                 job_id,
                 45,
                 "PROCESSING",
-                "Uploading synthesized audio to S3...",
+                "Uploading synthesized audio to Cloudflare R2...",
             )
-            s3_audio_key = f"audio/{job_id}/voiceover.mp3"
+            r2_audio_key = f"audio/{job_id}/voiceover.mp3"
             audio_url = await storage_service.upload_bytes(
                 file_bytes=audio_bytes,
-                s3_key=s3_audio_key,
+                r2_key=r2_audio_key,
                 content_type="audio/mpeg",
             )
             job.audio_url = audio_url
@@ -104,7 +110,7 @@ async def process_video_render_job(
             }
 
             for sim in [75, 85, 95]:
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(0.1)
                 await publish_job_progress(
                     job_id,
                     sim,
@@ -137,7 +143,7 @@ async def process_video_render_job(
                 "output_video_url": output_video_url,
             }
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             error_msg = str(e)
             job.status = JobStatus.FAILED
             job.error_message = error_msg
@@ -153,3 +159,9 @@ async def process_video_render_job(
                 "job_id": job_id,
                 "error": error_msg,
             }
+
+    if db_session:
+        return await _run(db_session)
+    else:
+        async with AsyncSessionLocal() as session:
+            return await _run(session)

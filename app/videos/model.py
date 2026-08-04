@@ -1,13 +1,13 @@
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, dict
+from typing import Any
 
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, Relationship, SQLModel
 
-if TYPE_CHECKING:
-    from app.users.model import User
+from app.users.model import User
 
 
 class JobStatus(str, Enum):
@@ -32,7 +32,8 @@ class VideoJob(SQLModel, table=True):
     progress_percent: int = Field(default=0, nullable=False)
 
     script_json: dict[str, Any] = Field(
-        default={}, sa_column=Column(JSONB)
+        default={},
+        sa_column=Column(JSON().with_variant(JSONB, "postgresql")),
     )
     background_asset_id: str | None = Field(
         default="gameplay_minecraft_01"
@@ -48,4 +49,4 @@ class VideoJob(SQLModel, table=True):
     )
 
     # Relationship
-    user: Optional["User"] = Relationship(back_populates="video_jobs")
+    user: User | None = Relationship(back_populates="video_jobs")

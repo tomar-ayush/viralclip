@@ -1,5 +1,3 @@
-from typing import list
-
 from pydantic import BaseModel, Field
 
 
@@ -28,10 +26,10 @@ class SceneSchema(BaseModel):
 class ScriptGenerateRequest(BaseModel):
     topic: str = Field(
         ..., example="5 Mind-Blowing AI Tools Changing the World"
-    )
+    )  # pyright: ignore[reportCallIssue]
     tone: str = Field(
         default="dramatic & engaging", example="dramatic & engaging"
-    )
+    )  # pyright: ignore[reportCallIssue]
     target_duration_seconds: int = Field(default=30, ge=15, le=60)
 
 

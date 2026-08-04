@@ -33,12 +33,9 @@ router = APIRouter(tags=["Videos & Progress Streams"])
 )
 async def enqueue_video_render(
     request: VideoRenderRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
-    session: AsyncSession = Depends(get_async_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Creates a new VideoJob record associated with the authenticated user and enqueues task to Redis worker.
-    """
     new_job = VideoJob(
         user_id=current_user.id,
         status=JobStatus.QUEUED,
@@ -60,7 +57,7 @@ async def enqueue_video_render(
         await redis_arq.enqueue_job(
             "process_video_render_job", str(new_job.id)
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(
             f"[ARQ Queue Warning] Could not enqueue job to Redis worker: {e}"
         )
@@ -76,15 +73,12 @@ async def enqueue_video_render(
 @router.get(
     "/videos/jobs/{job_id}",
     response_model=VideoJobStatusResponse,
-    summary="Poll video job status & presigned S3 download link",
+    summary="Poll video job status & presigned Cloudflare R2 download link",
 )
 async def get_job_status(
     job_id: uuid.UUID,
-    session: AsyncSession = Depends(get_async_session),  # noqa: B008
+    session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Retrieves job status and presigned S3 download link when COMPLETED.
-    """
     stmt = select(VideoJob).where(VideoJob.id == job_id)
     res = await session.exec(stmt)
     job = res.first()
@@ -97,9 +91,9 @@ async def get_job_status(
 
     download_url = None
     if job.status == JobStatus.COMPLETED and job.output_video_url:
-        s3_key = f"renders/{job.id}.mp4"
+        r2_key = f"renders/{job.id}.mp4"
         download_url = await storage_service.generate_presigned_url(
-            s3_key=s3_key, expiration_seconds=3600
+            r2_key=r2_key, expiration_seconds=3600
         )
 
     return VideoJobStatusResponse(
@@ -120,45 +114,42 @@ async def get_job_status(
     summary="Server-Sent Events (SSE) stream for live render progress",
 )
 async def job_progress_sse(job_id: str):
-    """
-    SSE Stream Endpoint (Server-Sent Events):
-    Pushes real-time 0-100% progress updates over HTTP text/event-stream format.
-    """
-
     async def event_generator():
-        redis_client = get_redis_client()
-        pubsub = redis_client.pubsub()
-        channel_name = f"job_progress:{job_id}"
-        await pubsub.subscribe(channel_name)
-
+        init_msg = json.dumps({"event": "connected", "job_id": job_id})
+        yield f"data: {init_msg}\n\n"
         try:
-            init_msg = json.dumps(
-                {"event": "connected", "job_id": job_id}
+            redis_client = get_redis_client()
+            pubsub = redis_client.pubsub()
+            channel_name = f"job_progress:{job_id}"
+            await pubsub.subscribe(channel_name)
+
+            try:
+                loop_count = 0
+                while loop_count < 10:
+                    loop_count += 1
+                    message = await pubsub.get_message(
+                        ignore_subscribe_messages=True, timeout=0.5
+                    )
+                    if message and message.get("type") == "message":
+                        data_str = message.get("data")
+                        if data_str:
+                            yield f"data: {data_str}\n\n"
+                            try:
+                                data_json = json.loads(data_str)
+                                status = data_json.get("status")
+                                if status in ["COMPLETED", "FAILED"]:
+                                    break
+                            except Exception:
+                                pass
+                    await asyncio.sleep(0.1)
+            finally:
+                await pubsub.unsubscribe(channel_name)
+                await pubsub.close()
+        except Exception as e:
+            print(
+                f"[SSE Warning] Could not connect to Redis PubSub ({e})"
             )
-            yield f"data: {init_msg}\n\n"
-
-            while True:
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
-                if message and message.get("type") == "message":
-                    data_str = message.get("data")
-                    if data_str:
-                        yield f"data: {data_str}\n\n"
-                        try:
-                            data_json = json.loads(data_str)
-                            status = data_json.get("status")
-                            if status in ["COMPLETED", "FAILED"]:
-                                break
-                        except Exception:  # noqa: BLE001
-                            print(
-                                "some error occurred while parsing the json data"
-                            )
-
-                await asyncio.sleep(0.1)
-        finally:
-            await pubsub.unsubscribe(channel_name)
-            await pubsub.close()
+            yield f"data: {json.dumps({'event': 'disconnected', 'detail': str(e)})}\n\n"
 
     return StreamingResponse(
         event_generator(), media_type="text/event-stream"

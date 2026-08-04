@@ -31,15 +31,20 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # AWS S3 Settings
-    AWS_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: str = "mock-key-id"
-    AWS_SECRET_ACCESS_KEY: str = "mock-secret-key"
-    S3_BUCKET_NAME: str = "viral-video-assets-bucket"
+    # Cloudflare R2 Storage (S3 Compatible API)
+    CLOUDFLARE_ACCOUNT_ID: str = "mock-cloudflare-account-id"
+    R2_ACCESS_KEY_ID: str = "mock-r2-access-key-id"
+    R2_SECRET_ACCESS_KEY: str = "mock-r2-secret-access-key"
+    R2_BUCKET_NAME: str = "viral-video-assets-bucket"
+    R2_PUBLIC_DOMAIN: str = "https://pub-r2.viralcut.ai"
+
+    @property
+    def r2_endpoint_url(self) -> str:
+        return f"https://{self.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
     # AWS Remotion Lambda Config
     REMOTION_LAMBDA_FUNCTION_NAME: str = "remotion-render-function"
-    REMOTION_SERVE_URL: str = "https://remotion-lambda-assets.s3.us-east-1.amazonaws.com/sites/viral-short-template/index.html"
+    REMOTION_SERVE_URL: str = "https://pub-r2.viralcut.ai/sites/viral-short-template/index.html"
     REMOTION_COMPOSITION_ID: str = "ShortVideoComposition"
 
     model_config = SettingsConfigDict(

@@ -22,14 +22,17 @@ async def publish_job_progress(
     """
     Publishes job progress update to Redis PubSub channel 'job_progress:{job_id}'.
     """
-    client = get_redis_client()
-    channel = f"job_progress:{job_id}"
-    message = json.dumps(
-        {
-            "job_id": job_id,
-            "progress_percent": progress_percent,
-            "status": status,
-            "detail": detail,
-        }
-    )
-    await client.publish(channel, message)
+    try:
+        client = get_redis_client()
+        channel = f"job_progress:{job_id}"
+        message = json.dumps(
+            {
+                "job_id": job_id,
+                "progress_percent": progress_percent,
+                "status": status,
+                "detail": detail,
+            }
+        )
+        await client.publish(channel, message)
+    except Exception as e:
+        print(f"[Redis Warning] Could not publish job progress: {e}")

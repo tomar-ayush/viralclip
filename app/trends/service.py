@@ -1,5 +1,4 @@
 import json
-from typing import list
 
 import feedparser
 import httpx
@@ -21,7 +20,7 @@ class TrendsService:
             if cached_data:
                 parsed = json.loads(cached_data)
                 return TrendsResponse(**parsed)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[Trends Cache Warning] {e}")
 
         rss_url = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}"
@@ -61,7 +60,7 @@ class TrendsService:
                                 ),
                             )
                         )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[Trends Fetch Error] {e}")
 
         if not trend_items:
@@ -92,7 +91,7 @@ class TrendsService:
                 self.CACHE_EXPIRE_SECONDS,
                 json.dumps(response_data.model_dump()),
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[Trends Cache Write Warning] {e}")
 
         return response_data

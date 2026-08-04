@@ -4,46 +4,43 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 import jwt
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.common.config import settings
 from app.common.db import get_async_session
 
-# Password Hashing context (bcrypt)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 Scheme for Bearer token authorization header
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/user/login"
 )
 
 
-# --- Password Hashing Utilities ---
-
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifies a plain text password against a stored bcrypt hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
     """Generates a secure bcrypt hash of a plain text password."""
-    return pwd_context.hash(password)
-
-
-# --- JWT Token Utilities ---
+    pwd_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
 
 def create_access_token(
     data: dict, expires_delta: timedelta | None = None
 ) -> str:
-    """Generates a signed JWT Access Token containing user claim payload."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -61,7 +58,6 @@ def create_access_token(
 
 
 def decode_access_token(token: str) -> dict:
-    """Decodes and validates a JWT Access Token signature and expiration."""
     try:
         payload = jwt.decode(
             token,
@@ -85,13 +81,10 @@ def decode_access_token(token: str) -> dict:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(get_async_session),  # noqa: B008
+    session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    FastAPI dependency to extract, decode, and authenticate current user from Bearer Token.
-    """
     payload = decode_access_token(token)
-    user_id_str: str = payload.get("sub")
+    user_id_str: str | None = payload.get("sub")
     if not user_id_str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -124,9 +117,6 @@ async def get_current_user(
     return user
 
 
-# --- AES-256-GCM Encryption Utilities for BYOK Keys ---
-
-
 def _get_master_key_bytes() -> bytes:
     key_str = settings.ENCRYPTION_MASTER_KEY
     try:
@@ -139,7 +129,6 @@ def _get_master_key_bytes() -> bytes:
 
 
 def encrypt_api_key(plain_api_key: str) -> str:
-    """Encrypts a third-party BYOK API key using AES-256-GCM."""
     if not plain_api_key:
         raise ValueError("API key cannot be empty")
     master_key = _get_master_key_bytes()
@@ -153,7 +142,6 @@ def encrypt_api_key(plain_api_key: str) -> str:
 
 
 def decrypt_api_key(encrypted_payload_b64: str) -> str:
-    """Decrypts an AES-256-GCM encrypted API key payload."""
     if not encrypted_payload_b64:
         raise ValueError("Encrypted payload cannot be empty")
     master_key = _get_master_key_bytes()
@@ -170,7 +158,6 @@ def decrypt_api_key(encrypted_payload_b64: str) -> str:
 
 
 def generate_key_fingerprint(api_key: str) -> str:
-    """Generates a secure, non-reversible fingerprint (SHA-256 preview) for UI display."""
     sha = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
     prefix = api_key[:4] if len(api_key) >= 4 else "key"
     suffix = sha[:8]

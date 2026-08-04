@@ -1,0 +1,22 @@
+{
+  "include": [
+    "app",
+    "tests"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "venv",
+    ".venv"
+  ],
+  "pythonVersion": "3.11",
+  "pythonPlatform": "All",
+  "extraPaths": [
+    "."
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportUnusedImport": "warning",
+  "reportUnusedVariable": "warning"
+}

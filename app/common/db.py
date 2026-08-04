@@ -1,8 +1,9 @@
-from collections.abc import AsyncGenerator
+from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.config import settings
 
@@ -24,17 +25,11 @@ AsyncSessionLocal = sessionmaker(
 
 
 async def init_db() -> None:
-    """
-    Initializes database tables if they do not exist.
-    """
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    FastAPI dependency for providing an async database session per request.
-    """
     async with AsyncSessionLocal() as session:
         try:
             yield session

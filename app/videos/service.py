@@ -1,5 +1,5 @@
 import json
-from typing import Any, dict, list, tuple
+from typing import Any
 
 import boto3
 import httpx
@@ -48,7 +48,7 @@ class ElevenLabsService:
                         )
                     )
                     return audio_bytes, captions
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[ElevenLabs TTS Error] {e}")
 
         return self._generate_fallback_audio_and_alignment(text)
@@ -113,14 +113,12 @@ class RemotionService:
         self.function_name = settings.REMOTION_LAMBDA_FUNCTION_NAME
         self.serve_url = settings.REMOTION_SERVE_URL
         self.composition_id = settings.REMOTION_COMPOSITION_ID
-        self.region = settings.AWS_REGION
 
     def _get_lambda_client(self):
         return boto3.client(
             "lambda",
-            region_name=self.region,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
         )
 
     async def render_media_on_lambda(
@@ -151,13 +149,15 @@ class RemotionService:
             )
             output_url = res_payload.get(
                 "url",
-                f"https://{settings.S3_BUCKET_NAME}.s3.{self.region}.amazonaws.com/renders/{job_id}.mp4",
+                f"{settings.R2_PUBLIC_DOMAIN}/renders/{job_id}.mp4",
             )
             return render_id, output_url
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[Remotion Lambda Warning] {e}")
             mock_render_id = f"render_mock_{job_id[:8]}"
-            mock_output_url = f"https://{settings.S3_BUCKET_NAME}.s3.{self.region}.amazonaws.com/renders/{job_id}.mp4"
+            mock_output_url = (
+                f"{settings.R2_PUBLIC_DOMAIN}/renders/{job_id}.mp4"
+            )
             return mock_render_id, mock_output_url
 
 

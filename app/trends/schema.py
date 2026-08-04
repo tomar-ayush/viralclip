@@ -1,6 +1,4 @@
-from typing import list
-
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TrendItem(BaseModel):

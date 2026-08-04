@@ -36,7 +36,7 @@ class VideoJobStatusResponse(BaseModel):
     output_video_url: str | None = None
     download_url: str | None = Field(
         default=None,
-        description="Signed temporary S3 download link when COMPLETED",
+        description="Signed temporary Cloudflare R2 download link when COMPLETED",
     )
     error_message: str | None = None
     created_at: datetime
