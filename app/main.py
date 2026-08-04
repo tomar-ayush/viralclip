@@ -1,31 +1,31 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
-from app.core.db import init_db
-from app.api.v1.router import api_v1_router
+from app.common.config import settings
+from app.common.db import init_db
+from app.users import users_router
+from app.trends import trends_router
+from app.scripts import scripts_router
+from app.videos import videos_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application startup and shutdown lifecycle events handler.
-    """
-    print("[Startup] Initializing database tables...")
+    print("[Startup] Initializing database models...")
     try:
         await init_db()
-        print("[Startup] Database tables initialized successfully.")
+        print("[Startup] Database tables initialized.")
     except Exception as e:
-        print(f"[Startup Warning] Could not connect to PostgreSQL DB ({e}). Running app in standalone/degraded mode.")
+        print(f"[Startup Warning] Database connection warning ({e}). Running in degraded mode.")
     
     yield
-    print("[Shutdown] Cleaning up platform backend services...")
+    print("[Shutdown] Cleaning up services...")
 
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Automated Short-Form Viral Video Generation Platform Backend API",
+    description="Automated Short-Form Viral Video Generation Platform Backend",
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
@@ -33,7 +33,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for frontend web application & preview tools
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,8 +41,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include v1 API routes
-app.include_router(api_v1_router, prefix=settings.API_V1_STR)
+# Aggregate domain routers under API v1 prefix
+v1_router = APIRouter(prefix=settings.API_V1_STR)
+v1_router.include_router(users_router)
+v1_router.include_router(trends_router)
+v1_router.include_router(scripts_router)
+v1_router.include_router(videos_router)
+
+app.include_router(v1_router)
 
 
 @app.get("/", tags=["Health"])
