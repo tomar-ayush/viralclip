@@ -1,16 +1,17 @@
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import list
+
+from pydantic import BaseModel
 
 
 class TrendItem(BaseModel):
     title: str
-    traffic: Optional[str] = None
-    news_item_title: Optional[str] = None
-    news_item_url: Optional[str] = None
-    pub_date: Optional[str] = None
+    traffic: str | None = None
+    news_item_title: str | None = None
+    news_item_url: str | None = None
+    pub_date: str | None = None
 
 
 class TrendsResponse(BaseModel):
     source: str = "Google Trends RSS"
     items_count: int
-    items: List[TrendItem]
+    items: list[TrendItem]

@@ -1,7 +1,9 @@
 import base64
 import hashlib
 import os
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from app.common.config import settings
 
 
@@ -27,7 +29,9 @@ def encrypt_api_key(plain_api_key: str) -> str:
     master_key = _get_master_key_bytes()
     aesgcm = AESGCM(master_key)
     nonce = os.urandom(12)
-    ciphertext = aesgcm.encrypt(nonce, plain_api_key.encode("utf-8"), associated_data=None)
+    ciphertext = aesgcm.encrypt(
+        nonce, plain_api_key.encode("utf-8"), associated_data=None
+    )
     payload = nonce + ciphertext
     return base64.b64encode(payload).decode("utf-8")
 
@@ -44,10 +48,12 @@ def decrypt_api_key(encrypted_payload_b64: str) -> str:
     payload = base64.b64decode(encrypted_payload_b64.encode("utf-8"))
     if len(payload) < 13:
         raise ValueError("Invalid encrypted payload length")
-        
+
     nonce = payload[:12]
     ciphertext = payload[12:]
-    decrypted_bytes = aesgcm.decrypt(nonce, ciphertext, associated_data=None)
+    decrypted_bytes = aesgcm.decrypt(
+        nonce, ciphertext, associated_data=None
+    )
     return decrypted_bytes.decode("utf-8")
 
 

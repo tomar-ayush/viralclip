@@ -1,6 +1,8 @@
 from datetime import datetime
 from uuid import UUID
+
 from pydantic import BaseModel, EmailStr, Field
+
 from app.users.model import KeyProvider
 
 
@@ -20,7 +22,9 @@ class UserResponse(BaseModel):
 class UserAPIKeyCreate(BaseModel):
     user_id: UUID
     provider: KeyProvider = Field(..., example=KeyProvider.OPENAI)
-    api_key: str = Field(..., min_length=8, example="sk-proj-1234567890abcdef")
+    api_key: str = Field(
+        ..., min_length=8, example="sk-proj-1234567890abcdef"
+    )
 
 
 class UserAPIKeyResponse(BaseModel):

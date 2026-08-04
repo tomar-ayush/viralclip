@@ -4,6 +4,7 @@ import uuid
 from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +16,7 @@ from app.storage.service import storage_service
 from app.videos.model import VideoJob, JobStatus
 from app.videos.schema import VideoRenderRequest, VideoJobResponse, VideoJobStatusResponse
 
-router = APIRouter(tags=["Videos & Progress Stream"])
+router = APIRouter(tags=["Videos & Real-Time Streams"])
 
 
 @router.post("/videos/render", response_model=VideoJobResponse, status_code=status.HTTP_202_ACCEPTED, summary="Enqueue video render job")
@@ -90,8 +91,49 @@ async def get_job_status(
     )
 
 
+@router.get("/videos/jobs/{job_id}/stream", summary="Server-Sent Events (SSE) stream for live render progress")
+async def job_progress_sse(job_id: str):
+    """
+    SSE Endpoint (Server-Sent Events):
+    Streams unidirectional 0-100% progress updates over HTTP/HTTP2 text/event-stream.
+    """
+    async def event_generator():
+        redis_client = get_redis_client()
+        pubsub = redis_client.pubsub()
+        channel_name = f"job_progress:{job_id}"
+        await pubsub.subscribe(channel_name)
+
+        try:
+            init_msg = json.dumps({"event": "connected", "job_id": job_id})
+            yield f"data: {init_msg}\n\n"
+
+            while True:
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if message and message.get("type") == "message":
+                    data_str = message.get("data")
+                    if data_str:
+                        yield f"data: {data_str}\n\n"
+                        try:
+                            data_json = json.loads(data_str)
+                            status = data_json.get("status")
+                            if status in ["COMPLETED", "FAILED"]:
+                                break
+                        except Exception:
+                            pass
+                await asyncio.sleep(0.1)
+        finally:
+            await pubsub.unsubscribe(channel_name)
+            await pubsub.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @router.websocket("/ws/jobs/{job_id}")
 async def job_progress_websocket(websocket: WebSocket, job_id: str):
+    """
+    WebSocket Endpoint:
+    Full-duplex real-time progress stream over WebSocket protocol.
+    """
     await websocket.accept()
     redis_client = get_redis_client()
     pubsub = redis_client.pubsub()

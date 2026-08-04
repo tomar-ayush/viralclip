@@ -1,4 +1,3 @@
-from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +12,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "viral_video_db"
-    DATABASE_URL: Optional[str] = None
+    DATABASE_URL: str | None = None
 
     @property
     def async_database_url(self) -> str:
