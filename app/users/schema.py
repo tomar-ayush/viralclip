@@ -6,8 +6,23 @@ from pydantic import BaseModel, EmailStr, Field
 from app.users.model import KeyProvider
 
 
-class UserCreate(BaseModel):
+class UserRegister(BaseModel):
     email: EmailStr = Field(..., example="creator@viralcut.ai")
+    password: str = Field(
+        ..., min_length=6, example="SecurePassword123!"
+    )
+
+
+class UserLogin(BaseModel):
+    email: EmailStr = Field(..., example="creator@viralcut.ai")
+    password: str = Field(..., example="SecurePassword123!")
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: UUID
+    email: str
 
 
 class UserResponse(BaseModel):
@@ -20,7 +35,6 @@ class UserResponse(BaseModel):
 
 
 class UserAPIKeyCreate(BaseModel):
-    user_id: UUID
     provider: KeyProvider = Field(..., example=KeyProvider.OPENAI)
     api_key: str = Field(
         ..., min_length=8, example="sk-proj-1234567890abcdef"

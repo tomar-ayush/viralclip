@@ -1,5 +1,4 @@
 from typing import list
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -27,7 +26,6 @@ class SceneSchema(BaseModel):
 
 
 class ScriptGenerateRequest(BaseModel):
-    user_id: UUID
     topic: str = Field(
         ..., example="5 Mind-Blowing AI Tools Changing the World"
     )

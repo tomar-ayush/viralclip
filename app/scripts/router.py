@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.common.db import get_async_session
-from app.common.security import decrypt_api_key
+from app.common.security import decrypt_api_key, get_current_user
 from app.scripts.schema import ScriptGenerateRequest, ScriptResponse
 from app.scripts.service import script_service
 from app.users.model import KeyProvider, User, UserAPIKey
@@ -14,22 +14,18 @@ router = APIRouter(prefix="/scripts", tags=["Scripts"])
 @router.post(
     "/generate",
     response_model=ScriptResponse,
-    summary="Synthesize timed script schema using OpenAI BYOK key",
+    summary="Synthesize timed script schema using authenticated user's OpenAI BYOK key",
 )
 async def generate_script(
     request: ScriptGenerateRequest,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    user_stmt = select(User).where(User.id == request.user_id)
-    user_res = await session.exec(user_stmt)
-    if not user_res.first():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id '{request.user_id}' not found.",
-        )
-
+    """
+    Generates a timed script using the authenticated user's stored OpenAI BYOK key.
+    """
     key_stmt = select(UserAPIKey).where(
-        UserAPIKey.user_id == request.user_id,
+        UserAPIKey.user_id == current_user.id,
         UserAPIKey.provider == KeyProvider.OPENAI,
     )
     key_res = await session.exec(key_stmt)
