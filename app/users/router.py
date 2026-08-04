@@ -32,7 +32,7 @@ router = APIRouter(prefix="/user", tags=["Users & Authentication"])
 )
 async def register_user(
     request: UserRegister,
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     Registers a new user by hashing their password with bcrypt.
@@ -60,7 +60,7 @@ async def register_user(
 )
 async def login_user(
     request: UserLogin,
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     Authenticates email and password, returning a signed JWT Access Token.
@@ -93,7 +93,7 @@ async def login_user(
     summary="Get current authenticated user profile",
 )
 async def get_my_profile(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     """
     Returns profile information for the logged-in user.
@@ -109,8 +109,8 @@ async def get_my_profile(
 )
 async def store_user_api_key(
     request: UserAPIKeyCreate,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),  # noqa: B008
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     Encrypts a user's third-party API Key using AES-256-GCM before writing to PostgreSQL DB.

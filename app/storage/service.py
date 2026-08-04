@@ -57,7 +57,7 @@ class StorageService:
                 ExpiresIn=expiration_seconds,
             )
             return url
-        except Exception:
+        except Exception:  # noqa: BLE001
             return f"https://mock-s3.viralcut.ai/download/{s3_key}?token=mock_presigned_token"
 
 

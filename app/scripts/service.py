@@ -65,7 +65,7 @@ class ScriptService:
                     ]
                     parsed = json.loads(content)
                     return ScriptResponse(**parsed)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(
                 f"[LLM Script Warning] OpenAI request failed ({e}). Using fallback synthesis."
             )

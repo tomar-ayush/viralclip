@@ -61,7 +61,7 @@ class TrendsService:
                                 ),
                             )
                         )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[Trends Fetch Error] {e}")
 
         if not trend_items:
@@ -92,7 +92,7 @@ class TrendsService:
                 self.CACHE_EXPIRE_SECONDS,
                 json.dumps(response_data.model_dump()),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[Trends Cache Write Warning] {e}")
 
         return response_data

@@ -18,8 +18,8 @@ router = APIRouter(prefix="/scripts", tags=["Scripts"])
 )
 async def generate_script(
     request: ScriptGenerateRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),  # noqa: B008
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     Generates a timed script using the authenticated user's stored OpenAI BYOK key.
@@ -35,7 +35,7 @@ async def generate_script(
     if api_key_obj:
         try:
             openai_key = decrypt_api_key(api_key_obj.encrypted_key)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed decrypting stored API key: {e!s}",

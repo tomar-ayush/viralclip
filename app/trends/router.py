@@ -18,7 +18,7 @@ async def get_viral_trends(
 ):
     try:
         return await trends_service.get_viral_trends(geo=geo.upper())
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch trends: {e!s}",

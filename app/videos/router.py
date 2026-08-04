@@ -33,8 +33,8 @@ router = APIRouter(tags=["Videos & Progress Streams"])
 )
 async def enqueue_video_render(
     request: VideoRenderRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),  # noqa: B008
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     Creates a new VideoJob record associated with the authenticated user and enqueues task to Redis worker.
@@ -60,7 +60,7 @@ async def enqueue_video_render(
         await redis_arq.enqueue_job(
             "process_video_render_job", str(new_job.id)
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(
             f"[ARQ Queue Warning] Could not enqueue job to Redis worker: {e}"
         )
@@ -80,7 +80,7 @@ async def enqueue_video_render(
 )
 async def get_job_status(
     job_id: uuid.UUID,
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     Retrieves job status and presigned S3 download link when COMPLETED.
@@ -150,8 +150,11 @@ async def job_progress_sse(job_id: str):
                             status = data_json.get("status")
                             if status in ["COMPLETED", "FAILED"]:
                                 break
-                        except Exception:
-                            pass
+                        except Exception:  # noqa: BLE001
+                            print(
+                                "some error occurred while parsing the json data"
+                            )
+
                 await asyncio.sleep(0.1)
         finally:
             await pubsub.unsubscribe(channel_name)

@@ -85,7 +85,7 @@ def decode_access_token(token: str) -> dict:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),  # noqa: B008
 ):
     """
     FastAPI dependency to extract, decode, and authenticate current user from Bearer Token.

@@ -1,18 +1,21 @@
 import asyncio
 import uuid
-from typing import Dict, Any
+from typing import Any, dict
+
 from sqlmodel import select
 
 from app.common.db import AsyncSessionLocal
-from app.common.security import decrypt_api_key
 from app.common.redis import publish_job_progress
-from app.users.model import UserAPIKey, KeyProvider
+from app.common.security import decrypt_api_key
 from app.storage.service import storage_service
-from app.videos.model import VideoJob, JobStatus
+from app.users.model import KeyProvider, UserAPIKey
+from app.videos.model import JobStatus, VideoJob
 from app.videos.service import elevenlabs_service, remotion_service
 
 
-async def process_video_render_job(ctx: Dict[str, Any], job_id: str) -> Dict[str, Any]:
+async def process_video_render_job(
+    ctx: dict[str, Any], job_id: str
+) -> dict[str, Any]:
     job_uuid = uuid.UUID(job_id)
 
     async with AsyncSessionLocal() as session:
@@ -28,56 +31,93 @@ async def process_video_render_job(ctx: Dict[str, Any], job_id: str) -> Dict[str
             job.progress_percent = 10
             await session.commit()
             await session.refresh(job)
-            await publish_job_progress(job_id, 10, "PROCESSING", "Job initialized. Fetching BYOK keys...")
+            await publish_job_progress(
+                job_id,
+                10,
+                "PROCESSING",
+                "Job initialized. Fetching BYOK keys...",
+            )
 
             # Fetch ElevenLabs API Key
             key_statement = select(UserAPIKey).where(
                 UserAPIKey.user_id == job.user_id,
-                UserAPIKey.provider == KeyProvider.ELEVENLABS
+                UserAPIKey.provider == KeyProvider.ELEVENLABS,
             )
             key_result = await session.exec(key_statement)
             api_key_obj = key_result.first()
             elevenlabs_key = "mock_elevenlabs_key"
             if api_key_obj:
-                elevenlabs_key = decrypt_api_key(api_key_obj.encrypted_key)
+                elevenlabs_key = decrypt_api_key(
+                    api_key_obj.encrypted_key
+                )
 
             # Synthesize voiceover audio
-            await publish_job_progress(job_id, 25, "PROCESSING", "Synthesizing audio via ElevenLabs...")
+            await publish_job_progress(
+                job_id,
+                25,
+                "PROCESSING",
+                "Synthesizing audio via ElevenLabs...",
+            )
             scenes = job.script_json.get("scenes", [])
             full_text = " ".join([s.get("text", "") for s in scenes])
             voice_id = job.voice_id or "21m00Tcm4TlvDq8ikWAM"
 
-            audio_bytes, word_captions = await elevenlabs_service.synthesize_speech_with_timestamps(
+            (
+                audio_bytes,
+                word_captions,
+            ) = await elevenlabs_service.synthesize_speech_with_timestamps(
                 text=full_text,
                 voice_id=voice_id,
-                elevenlabs_api_key=elevenlabs_key
+                elevenlabs_api_key=elevenlabs_key,
             )
 
             # Upload audio to S3
-            await publish_job_progress(job_id, 45, "PROCESSING", "Uploading synthesized audio to S3...")
+            await publish_job_progress(
+                job_id,
+                45,
+                "PROCESSING",
+                "Uploading synthesized audio to S3...",
+            )
             s3_audio_key = f"audio/{job_id}/voiceover.mp3"
             audio_url = await storage_service.upload_bytes(
                 file_bytes=audio_bytes,
                 s3_key=s3_audio_key,
-                content_type="audio/mpeg"
+                content_type="audio/mpeg",
             )
             job.audio_url = audio_url
             await session.commit()
 
             # Trigger Remotion Lambda render
-            await publish_job_progress(job_id, 65, "PROCESSING", "Dispatching task to Remotion Lambda...")
+            await publish_job_progress(
+                job_id,
+                65,
+                "PROCESSING",
+                "Dispatching task to Remotion Lambda...",
+            )
             input_props = {
                 "audioUrl": audio_url,
                 "backgroundAssetId": job.background_asset_id,
                 "scriptJson": job.script_json,
-                "wordCaptions": [caption.model_dump() for caption in word_captions]
+                "wordCaptions": [
+                    caption.model_dump() for caption in word_captions
+                ],
             }
 
             for sim in [75, 85, 95]:
                 await asyncio.sleep(1.0)
-                await publish_job_progress(job_id, sim, "PROCESSING", f"Compositing 9:16 vertical video frames ({sim}%)...")
+                await publish_job_progress(
+                    job_id,
+                    sim,
+                    "PROCESSING",
+                    f"Compositing 9:16 vertical video frames ({sim}%)...",
+                )
 
-            render_id, output_video_url = await remotion_service.render_media_on_lambda(job_id, input_props)
+            (
+                render_id,
+                output_video_url,
+            ) = await remotion_service.render_media_on_lambda(
+                job_id, input_props
+            )
 
             job.output_video_url = output_video_url
             job.progress_percent = 100
@@ -85,13 +125,31 @@ async def process_video_render_job(ctx: Dict[str, Any], job_id: str) -> Dict[str
             await session.commit()
             await session.refresh(job)
 
-            await publish_job_progress(job_id, 100, "COMPLETED", "Video rendering completed successfully!")
-            return {"status": "success", "job_id": job_id, "output_video_url": output_video_url}
+            await publish_job_progress(
+                job_id,
+                100,
+                "COMPLETED",
+                "Video rendering completed successfully!",
+            )
+            return {
+                "status": "success",
+                "job_id": job_id,
+                "output_video_url": output_video_url,
+            }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             error_msg = str(e)
             job.status = JobStatus.FAILED
             job.error_message = error_msg
             await session.commit()
-            await publish_job_progress(job_id, job.progress_percent, "FAILED", f"Job failed: {error_msg}")
-            return {"status": "failed", "job_id": job_id, "error": error_msg}
+            await publish_job_progress(
+                job_id,
+                job.progress_percent,
+                "FAILED",
+                f"Job failed: {error_msg}",
+            )
+            return {
+                "status": "failed",
+                "job_id": job_id,
+                "error": error_msg,
+            }

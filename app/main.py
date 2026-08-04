@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter
+
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.common.config import settings
 from app.common.db import init_db
-from app.users import users_router
-from app.trends import trends_router
 from app.scripts import scripts_router
+from app.trends import trends_router
+from app.users import users_router
 from app.videos import videos_router
 
 
@@ -16,9 +17,11 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         print("[Startup] Database tables initialized.")
-    except Exception as e:
-        print(f"[Startup Warning] Database connection warning ({e}). Running in degraded mode.")
-    
+    except Exception as e:  # noqa: BLE001
+        print(
+            f"[Startup Warning] Database connection warning ({e}). Running in degraded mode."
+        )
+
     yield
     print("[Shutdown] Cleaning up services...")
 
@@ -57,5 +60,5 @@ async def root():
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "version": "1.0.0",
-        "docs": "/docs"
+        "docs": "/docs",
     }
