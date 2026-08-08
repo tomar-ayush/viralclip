@@ -4,6 +4,7 @@ import uuid
 
 from arq import create_pool
 from arq.connections import RedisSettings
+from app.workers import get_redis_settings
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,11 +50,8 @@ async def enqueue_video_render(
     await session.refresh(new_job)
 
     try:
-        redis_arq = await create_pool(
-            RedisSettings(
-                host=settings.REDIS_HOST, port=settings.REDIS_PORT
-            )
-        )
+        # BUG-1 fix: use get_redis_settings() so SSL+password are included for Upstash
+        redis_arq = await create_pool(get_redis_settings())
         await redis_arq.enqueue_job(
             "process_video_render_job", str(new_job.id)
         )
@@ -73,7 +71,7 @@ async def enqueue_video_render(
 @router.get(
     "/videos/jobs/{job_id}",
     response_model=VideoJobStatusResponse,
-    summary="Poll video job status & presigned Cloudflare R2 download link",
+    summary="Poll video job status & presigned IDrive E2 download link",
 )
 async def get_job_status(
     job_id: uuid.UUID,
@@ -124,8 +122,10 @@ async def job_progress_sse(job_id: str):
             await pubsub.subscribe(channel_name)
 
             try:
+                # BUG-7 fix: 600 iterations × ~0.6s = ~6 min max stream duration
+                # BUG-3 fix: renamed 'status' → 'job_status' to avoid shadowing FastAPI's status import
                 loop_count = 0
-                while loop_count < 10:
+                while loop_count < 600:
                     loop_count += 1
                     message = await pubsub.get_message(
                         ignore_subscribe_messages=True, timeout=0.5
@@ -136,8 +136,8 @@ async def job_progress_sse(job_id: str):
                             yield f"data: {data_str}\n\n"
                             try:
                                 data_json = json.loads(data_str)
-                                status = data_json.get("status")
-                                if status in ["COMPLETED", "FAILED"]:
+                                job_status = data_json.get("status")
+                                if job_status in ["COMPLETED", "FAILED"]:
                                     break
                             except Exception:
                                 pass

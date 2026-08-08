@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import JSON
+from sqlalchemy import JSON, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, Relationship, SQLModel
 
@@ -27,7 +27,8 @@ class VideoJob(SQLModel, table=True):
         foreign_key="users.id", index=True, nullable=False
     )
     status: JobStatus = Field(
-        default=JobStatus.QUEUED, index=True, nullable=False
+        default=JobStatus.QUEUED,
+        sa_column=Column(String, index=True, nullable=False, default=JobStatus.QUEUED.value),
     )
     progress_percent: int = Field(default=0, nullable=False)
 
@@ -45,7 +46,7 @@ class VideoJob(SQLModel, table=True):
     error_message: str | None = Field(default=None)
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
     # Relationship

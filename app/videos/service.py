@@ -109,56 +109,50 @@ class ElevenLabsService:
 
 
 class RemotionService:
-    def __init__(self):
-        self.function_name = settings.REMOTION_LAMBDA_FUNCTION_NAME
-        self.serve_url = settings.REMOTION_SERVE_URL
-        self.composition_id = settings.REMOTION_COMPOSITION_ID
+    """
+    Calls the self-hosted ffmpeg render microservice.
+    Deploy render_service/ to HuggingFace Spaces, Render.com, or Koyeb (all free, no CC).
+    Set RENDER_SERVICE_URL and RENDER_SECRET in your .env.
+    """
 
-    def _get_lambda_client(self):
-        return boto3.client(
-            "lambda",
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-        )
+    def __init__(self):
+        self.render_service_url = settings.RENDER_SERVICE_URL.rstrip("/")
+        self.render_secret = settings.RENDER_SECRET
 
     async def render_media_on_lambda(
         self, job_id: str, input_props: dict[str, Any]
     ) -> tuple[str, str]:
+        """
+        Sends a render job to the ffmpeg microservice.
+        input_props must contain: audioUrl, backgroundAssetId, wordCaptions
+        Returns: (render_id, output_video_url)
+        """
         payload = {
-            "type": "render",
-            "serveUrl": self.serve_url,
-            "composition": self.composition_id,
-            "inputProps": input_props,
-            "codec": "h264",
-            "imageFormat": "jpeg",
-            "maxRetries": 2,
-            "privacy": "public",
-            "outName": f"renders/{job_id}.mp4",
+            "job_id": job_id,
+            "audio_url": input_props.get("audioUrl", ""),
+            "background_asset_id": input_props.get("backgroundAssetId", ""),
+            "word_captions": input_props.get("wordCaptions", []),
+            "secret": self.render_secret,
         }
 
         try:
-            client = self._get_lambda_client()
-            response = client.invoke(
-                FunctionName=self.function_name,
-                InvocationType="RequestResponse",
-                Payload=json.dumps(payload),
-            )
-            res_payload = json.loads(response["Payload"].read())
-            render_id = res_payload.get(
-                "renderId", f"remotion_render_{job_id}"
-            )
-            output_url = res_payload.get(
-                "url",
-                f"{settings.R2_PUBLIC_DOMAIN}/renders/{job_id}.mp4",
-            )
-            return render_id, output_url
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(
+                    f"{self.render_service_url}/render",
+                    json=payload,
+                )
+                if response.status_code == 200:
+                    res = response.json()
+                    return res["render_id"], res["output_url"]
+                else:
+                    print(f"[Render Service Error] HTTP {response.status_code}: {response.text}")
         except Exception as e:
-            print(f"[Remotion Lambda Warning] {e}")
-            mock_render_id = f"render_mock_{job_id[:8]}"
-            mock_output_url = (
-                f"{settings.R2_PUBLIC_DOMAIN}/renders/{job_id}.mp4"
-            )
-            return mock_render_id, mock_output_url
+            print(f"[Render Service Warning] {e}")
+
+        # Fallback: return a mock URL so the job doesn't hard-fail in dev
+        mock_render_id = f"render_mock_{job_id[:8]}"
+        mock_output_url = f"{settings.E2_PUBLIC_DOMAIN}/renders/{job_id}.mp4"
+        return mock_render_id, mock_output_url
 
 
 elevenlabs_service = ElevenLabsService()

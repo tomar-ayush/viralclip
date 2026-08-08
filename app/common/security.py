@@ -8,16 +8,14 @@ import bcrypt
 import jwt
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.common.config import settings
 from app.common.db import get_async_session
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/user/login"
-)
+http_bearer = HTTPBearer(auto_error=True)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -80,9 +78,10 @@ def decode_access_token(token: str) -> dict:
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
     session: AsyncSession = Depends(get_async_session),
 ):
+    token = credentials.credentials
     payload = decode_access_token(token)
     user_id_str: str | None = payload.get("sub")
     if not user_id_str:

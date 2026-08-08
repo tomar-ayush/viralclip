@@ -11,10 +11,15 @@ engine = create_async_engine(
     settings.async_database_url,
     echo=settings.DEBUG,
     future=True,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_pre_ping=True,      # test connection before use
+    pool_size=5,             # BUG-2 fix: Neon pooler max = 10; keep low
+    max_overflow=5,          # BUG-2 fix: total max 10 connections
+    pool_recycle=300,        # BUG-9 fix: recycle before Neon's 5min idle timeout
+    connect_args={
+        "server_settings": {"timezone": "UTC"}  # fix: asyncpg rejects tz-aware datetimes on TIMESTAMP columns
+    },
 )
+
 
 AsyncSessionLocal = sessionmaker(
     bind=engine,

@@ -20,9 +20,10 @@ class Settings(BaseSettings):
             return self.DATABASE_URL
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
-    # Redis Settings
+    # Redis Settings (Upstash \u2014 uses rediss:// with TLS + password)
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""      # set for Upstash; empty = no auth (local dev)
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # Security Settings (32-byte key for AES-256-GCM and JWT)
@@ -31,21 +32,17 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # Cloudflare R2 Storage (S3 Compatible API)
-    CLOUDFLARE_ACCOUNT_ID: str = "mock-cloudflare-account-id"
-    R2_ACCESS_KEY_ID: str = "mock-r2-access-key-id"
-    R2_SECRET_ACCESS_KEY: str = "mock-r2-secret-access-key"
-    R2_BUCKET_NAME: str = "viral-video-assets-bucket"
-    R2_PUBLIC_DOMAIN: str = "https://pub-r2.viralcut.ai"
+    # IDrive E2 Storage (S3 Compatible)
+    E2_ENDPOINT_URL: str = "https://s3.ap-northeast-1.idrivee2.com"
+    E2_REGION: str = "ap-northeast-1"
+    E2_ACCESS_KEY_ID: str = "HSgQGGT8aN3SeBVnKUuq"
+    E2_SECRET_ACCESS_KEY: str = "eJER6sWyS0hwSZRyTpoo6qDLF4v6IU7QHfANNhKc"
+    E2_BUCKET_NAME: str = "viralclip"
+    E2_PUBLIC_DOMAIN: str = "https://s3.ap-northeast-1.idrivee2.com/viralclip"
 
-    @property
-    def r2_endpoint_url(self) -> str:
-        return f"https://{self.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-    # AWS Remotion Lambda Config
-    REMOTION_LAMBDA_FUNCTION_NAME: str = "remotion-render-function"
-    REMOTION_SERVE_URL: str = "https://pub-r2.viralcut.ai/sites/viral-short-template/index.html"
-    REMOTION_COMPOSITION_ID: str = "ShortVideoComposition"
+    # FFmpeg Render Microservice (deploy render_service/ to HuggingFace/Render/Koyeb)
+    RENDER_SERVICE_URL: str = "http://localhost:7860"  # override with deployed URL
+    RENDER_SECRET: str = "changeme"                    # shared secret for auth
 
     model_config = SettingsConfigDict(
         env_file=".env",

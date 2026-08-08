@@ -7,21 +7,25 @@ from app.common.config import settings
 
 class StorageService:
     def __init__(self):
-        self.bucket_name = settings.R2_BUCKET_NAME
-        self.endpoint_url = settings.r2_endpoint_url
-        self.public_domain = settings.R2_PUBLIC_DOMAIN.rstrip("/")
+        self.bucket_name = settings.E2_BUCKET_NAME
+        self.endpoint_url = settings.E2_ENDPOINT_URL
+        self.public_domain = settings.E2_PUBLIC_DOMAIN.rstrip("/")
 
     def _get_client(self):
         """
-        Creates an S3-compatible client pointing to Cloudflare R2 endpoint.
+        Creates an S3-compatible boto3 client pointing to IDrive E2.
+        IDrive E2 uses path-style addressing and standard S3v4 signatures.
         """
         return boto3.client(
             "s3",
             endpoint_url=self.endpoint_url,
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-            region_name="auto",  # Cloudflare R2 uses 'auto' region
-            config=Config(signature_version="s3v4"),
+            aws_access_key_id=settings.E2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.E2_SECRET_ACCESS_KEY,
+            region_name=settings.E2_REGION,
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},  # IDrive E2 requires path-style
+            ),
         )
 
     async def upload_bytes(
@@ -31,7 +35,8 @@ class StorageService:
         content_type: str = "application/octet-stream",
     ) -> str:
         """
-        Uploads raw byte data to Cloudflare R2 storage bucket.
+        Uploads raw byte data to IDrive E2 bucket.
+        Returns the public URL of the uploaded object.
         """
         client = self._get_client()
         try:
@@ -44,7 +49,7 @@ class StorageService:
             return f"{self.public_domain}/{r2_key}"
         except (BotoCoreError, ClientError) as e:
             print(
-                f"[R2 Storage Warning] Cloudflare R2 upload error ({e}). Returning fallback URL."
+                f"[IDrive E2 Warning] Upload error ({e}). Returning fallback URL."
             )
             return f"{self.public_domain}/{r2_key}"
 
@@ -52,7 +57,7 @@ class StorageService:
         self, r2_key: str, expiration_seconds: int = 3600
     ) -> str:
         """
-        Generates pre-signed Cloudflare R2 download URL valid for expiration_seconds.
+        Generates a pre-signed IDrive E2 download URL valid for expiration_seconds.
         """
         client = self._get_client()
         try:
@@ -63,7 +68,7 @@ class StorageService:
             )
             return url
         except Exception:
-            return f"{self.public_domain}/download/{r2_key}?token=mock_presigned_token"
+            return f"{self.public_domain}/{r2_key}?token=mock_presigned_token"
 
 
 storage_service = StorageService()

@@ -77,28 +77,28 @@ async def process_video_render_job(
                 elevenlabs_api_key=elevenlabs_key,
             )
 
-            # Upload audio to Cloudflare R2
+            # Upload audio to IDrive E2
             await publish_job_progress(
                 job_id,
                 45,
                 "PROCESSING",
-                "Uploading synthesized audio to Cloudflare R2...",
+                "Uploading synthesized audio to IDrive E2...",
             )
-            r2_audio_key = f"audio/{job_id}/voiceover.mp3"
+            audio_key = f"audio/{job_id}/voiceover.mp3"
             audio_url = await storage_service.upload_bytes(
                 file_bytes=audio_bytes,
-                r2_key=r2_audio_key,
+                r2_key=audio_key,
                 content_type="audio/mpeg",
             )
             job.audio_url = audio_url
             await session.commit()
 
-            # Trigger Remotion Lambda render
+            # Trigger Modal serverless render
             await publish_job_progress(
                 job_id,
                 65,
                 "PROCESSING",
-                "Dispatching task to Remotion Lambda...",
+                "Dispatching task to Modal serverless render...",
             )
             input_props = {
                 "audioUrl": audio_url,
